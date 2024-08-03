@@ -1,0 +1,9 @@
+[package]
+name = "image-resizer-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.13", features = ["derive"] }
+image = "0.25.2"
+fast_image_resize = "4.2.1"
