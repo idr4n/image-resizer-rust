@@ -1,7 +1,4 @@
-use clap::{
-    error::{ContextKind, ContextValue, ErrorKind},
-    Arg, Command, Error,
-};
+use clap::{error::ErrorKind, Arg, Command, Error};
 use std::path::PathBuf;
 
 pub fn cli() -> Command {
@@ -32,12 +29,9 @@ fn value_parser_for_path(p: &str) -> Result<PathBuf, Error> {
         // ))
 
         // Clap error
-        // Err(Error::new(ErrorKind::ValueValidation))
-        let mut err = Error::new(ErrorKind::ValueValidation).with_cmd(&cli());
-        err.insert(
-            ContextKind::InvalidValue,
-            ContextValue::String("The provided path does not exist or is not a file.".to_owned()),
-        );
-        Err(err)
+        Err(Error::raw(
+            ErrorKind::InvalidValue,
+            format!("The path '{}' does not exist or is not a file.", p),
+        ))
     }
 }
