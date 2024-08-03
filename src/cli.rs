@@ -13,6 +13,20 @@ pub fn cli() -> Command {
                 .required(true)
                 .value_parser(value_parser_for_path),
         )
+        .arg(
+            Arg::new("width")
+                .short('W')
+                .long("width")
+                .help("New width of the image")
+                .value_parser(clap::value_parser!(u32)),
+        )
+        .arg(
+            Arg::new("height")
+                .short('H')
+                .long("height")
+                .help("New height of the image")
+                .value_parser(clap::value_parser!(u32)),
+        )
 }
 
 fn value_parser_for_path(p: &str) -> Result<PathBuf, Error> {
