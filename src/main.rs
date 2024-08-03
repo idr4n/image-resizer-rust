@@ -15,11 +15,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("At least one of width or height must be specified".into());
     }
 
+    let format = matches.get_one::<String>("format");
+
     println!(
-        "Resizing image '{:?}' with new width {:?} and new height {:?}",
+        "Resizing image {:?} with new width {:?}, new height {:?}, and format {}.",
         input,
         width.unwrap_or(&0),
-        height.unwrap_or(&0)
+        height.unwrap_or(&0),
+        format.unwrap()
     );
 
     Ok(())

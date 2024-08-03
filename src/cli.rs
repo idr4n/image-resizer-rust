@@ -27,6 +27,14 @@ pub fn cli() -> Command {
                 .help("New height of the image")
                 .value_parser(clap::value_parser!(u32)),
         )
+        .arg(
+            Arg::new("format")
+                .short('F')
+                .long("format")
+                .help("Specify the image format")
+                .value_parser(["jpeg", "png"])
+                .default_value("jpeg"),
+        )
 }
 
 fn value_parser_for_path(p: &str) -> Result<PathBuf, Error> {
