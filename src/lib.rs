@@ -1,7 +1,7 @@
 use fast_image_resize::{self as fr, images::Image, IntoImageView};
 use std::path::Path;
 
-use image::{DynamicImage, ImageBuffer, Rgba};
+use image::{DynamicImage, ImageBuffer, ImageResult, Rgba};
 
 struct ImageContainer {
     new_width: u32,
@@ -72,16 +72,14 @@ pub fn resize_image(
     input_path: &Path,
     width: Option<u32>,
     height: Option<u32>,
-    format: Option<&String>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>, Box<dyn std::error::Error>> {
     println!("The input given was: '{:?}'", input_path);
 
     println!(
-        "Resizing image {:?} with new width {}, new height {}, and format {}.",
+        "Resizing image {:?} with new width {} and new height {}.",
         input_path,
         width.unwrap_or(0),
         height.unwrap_or(0),
-        format.unwrap()
     );
 
     // Create Image instance from image path
@@ -97,7 +95,7 @@ pub fn resize_image(
     let resize_options = fr::ResizeOptions::default();
     resizer.resize(&img.src_image, &mut img.dst_image, &resize_options)?;
 
-    // After resizing...
+    // After resizing, create image buffer
     let resized_img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(
         img.new_width,
         img.new_height,
@@ -105,15 +103,20 @@ pub fn resize_image(
     )
     .unwrap();
 
+    Ok(resized_img)
+}
+
+pub fn save_image(
+    image: ImageBuffer<Rgba<u8>, Vec<u8>>,
+    format: Option<&String>,
+) -> ImageResult<()> {
     let output_path = match format {
-        Some(f) => match f.to_lowercase().as_str() {
+        Some(f) => match f.as_str() {
             "jpeg" => "output.jpg",
-            "png" => "output.png",
-            _ => "output.png", // Default to PNG for unknown formats
+            _ => "output.png", // Default to PNG
         },
         None => "output.png",
     };
-    // resized_img.save(output_path)?;
 
-    Ok(())
+    image.save(output_path)
 }
