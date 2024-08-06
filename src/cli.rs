@@ -60,7 +60,6 @@ pub fn determine_output_path(
             let validated_output = validate_output_path(&output_path)?;
             let path_new = Path::new(&validated_output);
             if path_new.is_absolute() {
-                // println!("Path is absolute");
                 Ok(path_new.to_path_buf())
             } else {
                 Ok(parent.join(output_path))

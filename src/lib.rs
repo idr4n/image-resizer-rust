@@ -141,7 +141,14 @@ pub fn save_image(
     println!("Saving image to: {:?}", new_output);
     println!("Using format: {:?}", save_format);
 
-    image
+    // Convert RGBA to RGB if saving as JPEG
+    let dynamic_image = if save_format == ImageFormat::Jpeg {
+        DynamicImage::ImageRgba8(image).to_rgb8().into()
+    } else {
+        DynamicImage::ImageRgba8(image)
+    };
+
+    dynamic_image
         .save_with_format(&new_output, save_format)
         .map_err(|e| format!("Failed to save image: {}", e).into())
 }
