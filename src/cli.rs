@@ -36,7 +36,6 @@ pub fn cli() -> Command {
                 .long("format")
                 .help("Specify the image format")
                 .value_parser(["jpeg", "png"])
-                .default_value("jpeg"),
         )
         .arg(
             Arg::new("output")

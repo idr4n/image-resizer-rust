@@ -1,6 +1,6 @@
 mod cli;
 
-use image_resizer_rust::{resize_image, save_image, string_to_image_format};
+use image_resizer_rust::{resize_image, save_image};
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,21 +16,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("At least one of width or height must be specified".into());
     }
 
-    let format = matches.get_one::<String>("format").unwrap();
+    let format = matches.get_one::<String>("format");
 
     let resized_img = resize_image(input, width, height)?;
 
     let output_path = cli::determine_output_path(input, output)?;
 
-    save_image(
-        resized_img,
-        &output_path,
-        Some(string_to_image_format(format)?),
-    )
-    .map(|_| {
+    save_image(resized_img, &output_path, format).map(|_| {
         println!("Image saved! Output path: {:?}", output_path);
     })?;
 
     Ok(())
 }
-

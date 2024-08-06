@@ -1,6 +1,6 @@
 use fast_image_resize::{self as fr, images::Image};
-use image::{guess_format, DynamicImage, ImageBuffer, ImageFormat, ImageResult, Rgba};
-use std::path::Path;
+use image::{guess_format, DynamicImage, ImageBuffer, ImageFormat, Rgba};
+use std::{ffi::OsStr, path::Path};
 
 struct ImageContainer {
     new_width: u32,
@@ -116,18 +116,34 @@ pub fn string_to_image_format(format: &str) -> Result<ImageFormat, Box<dyn std::
 pub fn save_image(
     image: ImageBuffer<Rgba<u8>, Vec<u8>>,
     output: &Path,
-    format: Option<ImageFormat>,
-) -> Result<ImageResult<()>, Box<dyn std::error::Error>> {
+    format: Option<&String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let parent = output.parent().unwrap_or(Path::new(""));
+    let stem = output.file_stem().unwrap_or(OsStr::new("output"));
     let extension = output.extension();
 
-    let save_format = match extension {
-        Some(ext) => {
-            string_to_image_format(ext.to_str().expect("Invalid Unicode in file extension"))?
+    let save_format = match (extension, format) {
+        (Some(ext), None) => {
+            string_to_image_format(ext.to_str().ok_or("Invalid Unicode in file extension")?)
         }
-        None => format.unwrap_or_else(|| infer_format(&image)),
+        (None, Some(f)) | (Some(_), Some(f)) => string_to_image_format(f),
+        (None, None) => Ok(infer_format(&image)),
+    }?;
+
+    let new_extension = match save_format {
+        ImageFormat::Png => "png",
+        ImageFormat::Jpeg => "jpeg",
+        _ => return Err("Unsupported image format".into()),
     };
 
-    Ok(image.save_with_format(output, save_format))
+    let new_output = parent.join(stem).with_extension(new_extension);
+
+    println!("Saving image to: {:?}", new_output);
+    println!("Using format: {:?}", save_format);
+
+    image
+        .save_with_format(&new_output, save_format)
+        .map_err(|e| format!("Failed to save image: {}", e).into())
 }
 
 fn infer_format(image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageFormat {
