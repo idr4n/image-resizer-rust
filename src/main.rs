@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = cli::cli().get_matches();
 
     let input = matches.get_one::<PathBuf>("input").unwrap();
-    let output = matches.get_one::<PathBuf>("output").cloned();
+    let output = matches.get_one::<String>("output").cloned();
     let width = matches.get_one::<u32>("width").copied();
     let height = matches.get_one::<u32>("height").copied();
 
@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // save_image(resized_img, format)?;
 
-    let output_path = cli::determine_output_path(input, output);
+    let output_path = cli::determine_output_path(input, output)?;
 
     println!("output path: {:?}", output_path);
 

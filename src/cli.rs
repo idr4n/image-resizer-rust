@@ -112,35 +112,163 @@ fn value_parser_for_path(p: &str) -> Result<PathBuf, Error> {
 mod tests {
     use super::*;
     use std::path::Path;
+    use tempfile::TempDir;
 
-    #[test]
-    fn test_determine_output_path_with_output() {
-        let input = PathBuf::from("/path/to/input.jpg");
-        let output = Some(PathBuf::from("output.png"));
-        let result = determine_output_path(&input, output);
-        assert_eq!(result, Path::new("/path/to/output.png"));
+    fn create_temp_dir() -> TempDir {
+        TempDir::new().expect("Failed to create temp directory")
     }
 
-    #[test]
-    fn test_determine_output_path_without_output() {
-        let input = PathBuf::from("/path/to/input.jpg");
-        let result = determine_output_path(&input, None);
-        assert_eq!(result, Path::new("/path/to/input_resized.jpg"));
+    mod determine_output_path_tests {
+        use super::*;
+        use std::process::Command;
+
+        #[test]
+        fn with_output() {
+            let input = PathBuf::from("/path/to/input.jpg");
+            let output = Some(String::from("output.png"));
+            let result = determine_output_path(&input, output).unwrap();
+            assert_eq!(result, Path::new("/path/to/output.png"));
+        }
+
+        #[test]
+        fn without_output() {
+            let input = PathBuf::from("/path/to/input.jpg");
+            let result = determine_output_path(&input, None).unwrap();
+            assert_eq!(result, Path::new("/path/to/input_resized.jpg"));
+        }
+
+        #[test]
+        fn with_absolute_output() {
+            let temp_dir = create_temp_dir();
+            let input = temp_dir.path().join("input.jpg");
+            let output = temp_dir.path().join("output.png");
+
+            let result =
+                determine_output_path(&input, Some(output.to_string_lossy().to_string())).unwrap();
+            assert_eq!(result, output);
+            assert!(result.is_absolute());
+            assert_eq!(result.extension().unwrap(), "png");
+            assert_ne!(result, input);
+        }
+
+        #[test]
+        fn with_current_dir() {
+            let input = PathBuf::from("/path/to/input.jpg");
+            let output = Some(String::from("./output.png"));
+            let result = determine_output_path(&input, output).unwrap();
+            assert_eq!(result, Path::new("/path/to/output.png"));
+        }
+
+        #[test]
+        fn from_shell_relative() {
+            let input = Path::new("~/Downloads/shell_output.jpeg");
+            let output = Some(String::from("./output"));
+
+            let cmd_output = Command::new("echo")
+                .arg(input.to_string_lossy().to_string())
+                .output()
+                .expect("Failed to execute command");
+
+            let shell_path = String::from_utf8(cmd_output.stdout)
+                .unwrap()
+                .trim()
+                .to_string();
+
+            let result = determine_output_path(Path::new(&shell_path), output);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), Path::new("~/Downloads/output"));
+        }
     }
 
-    #[test]
-    fn test_determine_output_path_with_absolute_output() {
-        let input = PathBuf::from("/path/to/input.jpg");
-        let output = Some(PathBuf::from("/absolute/path/output.png"));
-        let result = determine_output_path(&input, output);
-        assert_eq!(result, Path::new("/absolute/path/output.png"));
+    mod validate_output_path_tests {
+        use super::*;
+        use std::process::Command;
+
+        #[test]
+        fn valid_path() {
+            let temp_dir = create_temp_dir();
+            let path = temp_dir.path().join("output.jpeg");
+            let result = validate_output_path(&path.to_string_lossy().to_string());
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), path.to_string_lossy().to_string());
+        }
+
+        #[test]
+        fn invalid_extension() {
+            let path = String::from("/tmp/output.gif");
+            let result = validate_output_path(&path);
+            assert!(result.is_err());
+            assert_eq!(
+                result.unwrap_err().to_string(),
+                "You need to specify a valid extension, either jpeg, png or no extension."
+            );
+        }
+
+        #[test]
+        fn nonexistent_directory() {
+            let path = String::from("/nonexistent/directory/output.jpeg");
+            let result = validate_output_path(&path);
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("cannot be found"));
+        }
+
+        #[test]
+        fn from_shell() {
+            let temp_dir = create_temp_dir();
+            let path = temp_dir.path().join("shell_output.jpeg");
+
+            let output = Command::new("echo")
+                .arg(path.to_string_lossy().to_string())
+                .output()
+                .expect("Failed to execute command");
+
+            let shell_path = String::from_utf8(output.stdout).unwrap().trim().to_string();
+
+            let result = validate_output_path(&shell_path);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), path.to_string_lossy().to_string());
+        }
     }
 
-    #[test]
-    fn test_determine_output_path_with_current_dir() {
-        let input = PathBuf::from("/path/to/input.jpg");
-        let output = Some(PathBuf::from("./output.png"));
-        let result = determine_output_path(&input, output);
-        assert_eq!(result, Path::new("/path/to/output.png"));
+    mod value_parser_for_path_test {
+        use super::*;
+        use std::fs::File;
+        use std::process::Command;
+
+        #[test]
+        fn from_shell() {
+            let temp_dir = create_temp_dir();
+            let path = temp_dir.path().join("shell_output.jpeg");
+
+            // Create the file
+            File::create(&path).expect("Failed to create test file");
+
+            let output = Command::new("echo")
+                .arg(path.to_string_lossy().to_string())
+                .output()
+                .expect("Failed to execute command");
+
+            let shell_path = String::from_utf8(output.stdout).unwrap().trim().to_string();
+
+            let result = value_parser_for_path(&shell_path);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), path);
+        }
+
+        #[test]
+        fn nonexistent_file() {
+            let temp_dir = create_temp_dir();
+            let nonexistent_path = temp_dir.path().join("nonexistent.jpeg");
+
+            let result = value_parser_for_path(nonexistent_path.to_str().unwrap());
+            assert!(result.is_err());
+
+            if let Err(err) = result {
+                assert_eq!(err.kind(), ErrorKind::InvalidValue);
+                assert!(err.to_string().contains("does not exist or is not a file"));
+            } else {
+                panic!("Expected an error, but got Ok");
+            }
+        }
     }
 }
