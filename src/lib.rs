@@ -158,8 +158,13 @@ fn infer_format(image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageFormat {
     let bytes = image.as_raw();
 
     // Use guess_format to infer the image format
-    // guess_format(bytes).unwrap_or(ImageFormat::Jpeg)
-    guess_format(bytes).expect("Could not guess image format.")
+    match guess_format(bytes) {
+        Ok(format) => format,
+        Err(_) => {
+            eprintln!("Warning: Could not guess image format. Defaulting to JPEG.");
+            ImageFormat::Jpeg
+        }
+    }
 }
 
 #[cfg(test)]
@@ -221,3 +226,4 @@ mod tests {
         }
     }
 }
+
