@@ -42,32 +42,56 @@ pub fn cli() -> Command {
             Arg::new("output")
                 .short('o')
                 .long("output")
-                .help("Absolute path or relative to the input image.\nIf extension is not provided, it will be inferred from the image or determined by the --format flag")
+                .help("Absolute or relative path including new image name.\nIf only a name is provide (e.g. output.), then the directory of the input image will be used.")
                 .required(false)
-                .value_parser(value_parser!(PathBuf)),
+                .value_parser(value_parser!(String)),
         )
 }
 
-pub fn determine_output_path(input: &Path, output: Option<PathBuf>) -> PathBuf {
+pub fn determine_output_path(
+    input: &Path,
+    output: Option<String>,
+) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let parent = input.parent().unwrap_or(Path::new(""));
     let stem = input.file_stem().unwrap_or(OsStr::new("output"));
-    let extension = input.extension().unwrap_or(OsStr::new(""));
+    let extension = input.extension().unwrap_or(OsStr::new("jpeg"));
 
     match output {
-        Some(path) => {
-            if path.is_absolute() {
-                println!("Path is absolute");
-                path
+        Some(output_path) => {
+            let validated_output = validate_output_path(&output_path)?;
+            let path_new = Path::new(&validated_output);
+            if path_new.is_absolute() {
+                // println!("Path is absolute");
+                Ok(path_new.to_path_buf())
             } else {
-                parent.join(path)
+                Ok(parent.join(output_path))
             }
         }
         None => {
             let new_stem = format!("{}_resized", stem.to_string_lossy());
-            parent
+            Ok(parent
                 .join(PathBuf::from(new_stem))
-                .with_extension(extension)
+                .with_extension(extension))
         }
+    }
+}
+
+fn validate_output_path(path: &String) -> Result<String, Box<dyn std::error::Error>> {
+    let parent = Path::new(&path).parent().unwrap_or(Path::new(""));
+
+    if !parent.is_dir() && parent != Path::new("") {
+        return Err(format!("The given output directory {:?} cannot be found.", parent).into());
+    };
+
+    let stem = Path::new(&path).file_stem().unwrap_or(OsStr::new("output"));
+    let extension = Path::new(&path).extension().unwrap_or(OsStr::new(""));
+
+    match extension.to_str() {
+        Some("jpeg") | Some("jpg") | Some("png") | Some("") => {
+            let validated_path = parent.join(stem).with_extension(extension);
+            Ok(validated_path.to_string_lossy().to_string())
+        }
+        _ => Err("You need to specify a valid extension, either jpeg, png or no extension.".into()),
     }
 }
 
