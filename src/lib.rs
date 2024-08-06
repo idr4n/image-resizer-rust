@@ -1,7 +1,6 @@
-use fast_image_resize::{self as fr, images::Image, IntoImageView};
+use fast_image_resize::{self as fr, images::Image};
+use image::{guess_format, DynamicImage, ImageBuffer, ImageFormat, ImageResult, Rgba};
 use std::path::Path;
-
-use image::{DynamicImage, ImageBuffer, ImageResult, Rgba};
 
 struct ImageContainer {
     new_width: u32,
@@ -106,17 +105,96 @@ pub fn resize_image(
     Ok(resized_img)
 }
 
+pub fn string_to_image_format(format: &str) -> Result<ImageFormat, Box<dyn std::error::Error>> {
+    match format.to_lowercase().as_str() {
+        "jpeg" | "jpg" => Ok(ImageFormat::Jpeg),
+        "png" => Ok(ImageFormat::Png),
+        _ => Err(format!("Unsoported image format {}", format).into()),
+    }
+}
+
 pub fn save_image(
     image: ImageBuffer<Rgba<u8>, Vec<u8>>,
-    format: Option<&String>,
-) -> ImageResult<()> {
-    let output_path = match format {
-        Some(f) => match f.as_str() {
-            "jpeg" => "output.jpg",
-            _ => "output.png", // Default to PNG
-        },
-        None => "output.png",
+    output: &Path,
+    format: Option<ImageFormat>,
+) -> Result<ImageResult<()>, Box<dyn std::error::Error>> {
+    let extension = output.extension();
+
+    let save_format = match extension {
+        Some(ext) => {
+            string_to_image_format(ext.to_str().expect("Invalid Unicode in file extension"))?
+        }
+        None => format.unwrap_or_else(|| infer_format(&image)),
     };
 
-    image.save(output_path)
+    Ok(image.save_with_format(output, save_format))
+}
+
+fn infer_format(image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageFormat {
+    // Convert the image buffer to a byte slice
+    let bytes = image.as_raw();
+
+    // Use guess_format to infer the image format
+    // guess_format(bytes).unwrap_or(ImageFormat::Jpeg)
+    guess_format(bytes).expect("Could not guess image format.")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{ImageBuffer, Rgba};
+
+    fn create_mock_jpeg() -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        let mut buffer = vec![0; 400]; // 10x10 RGBA image = 400 bytes
+        buffer[0] = 0xFF;
+        buffer[1] = 0xD8;
+        buffer[2] = 0xFF;
+        buffer[3] = 0xE0;
+        buffer[6] = 0x4A;
+        buffer[7] = 0x46;
+        buffer[8] = 0x49;
+        buffer[9] = 0x46;
+        buffer[10] = 0x00;
+        ImageBuffer::from_raw(10, 10, buffer).expect("Failed to create mock JPEG")
+    }
+
+    fn create_mock_png() -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        let mut buffer = vec![0; 400]; // 10x10 RGBA image = 400 bytes
+        buffer[0] = 0x89;
+        buffer[1] = 0x50;
+        buffer[2] = 0x4E;
+        buffer[3] = 0x47;
+        buffer[4] = 0x0D;
+        buffer[5] = 0x0A;
+        buffer[6] = 0x1A;
+        buffer[7] = 0x0A;
+        ImageBuffer::from_raw(10, 10, buffer).expect("Failed to create mock PNG")
+    }
+
+    fn create_mock_unknown() -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        ImageBuffer::from_raw(10, 10, vec![0; 400]).expect("Failed to create mock unknown")
+    }
+
+    mod infer_format_test {
+        use super::*;
+
+        #[test]
+        fn test_infer_format_jpeg() {
+            let image = create_mock_jpeg();
+            assert_eq!(infer_format(&image), ImageFormat::Jpeg);
+        }
+
+        #[test]
+        fn test_infer_format_png() {
+            let image = create_mock_png();
+            assert_eq!(infer_format(&image), ImageFormat::Png);
+        }
+
+        #[test]
+        #[should_panic(expected = "Could not guess image format.")]
+        fn test_infer_format_unknown() {
+            let image = create_mock_unknown();
+            infer_format(&image);
+        }
+    }
 }
