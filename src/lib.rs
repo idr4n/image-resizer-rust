@@ -150,7 +150,7 @@ pub fn save_image(
             string_to_image_format(ext.to_str().ok_or("Invalid Unicode in file extension")?)
         }
         (None, Some(f)) | (Some(_), Some(f)) => string_to_image_format(f),
-        (None, None) => Ok(infer_format(&image)),
+        (None, None) => Ok(infer_format(&image, Some(output))),
     }?;
 
     let new_extension = match save_format {
@@ -185,7 +185,7 @@ pub fn save_image(
     })
 }
 
-fn infer_format(image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageFormat {
+fn infer_format(image: &ImageBuffer<Rgba<u8>, Vec<u8>>, path: Option<&Path>) -> ImageFormat {
     // Convert the image buffer to a byte slice
     let bytes = image.as_raw();
 
@@ -193,8 +193,19 @@ fn infer_format(image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageFormat {
     match guess_format(bytes) {
         Ok(format) => format,
         Err(_) => {
-            eprintln!("Warning: Could not guess image format. Defaulting to JPEG.");
-            ImageFormat::Jpeg
+            // Try to infer format from path if available
+            if let Some(file_path) = path {
+                match ImageFormat::from_path(file_path) {
+                    Ok(format) => format,
+                    Err(_) => {
+                        eprintln!("Warning: Could not guess image format. Defaulting to JPEG.");
+                        ImageFormat::Jpeg
+                    }
+                }
+            } else {
+                eprintln!("Warning: Could not guess image format. Defaulting to JPEG.");
+                ImageFormat::Jpeg
+            }
         }
     }
 }
@@ -203,6 +214,7 @@ fn infer_format(image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageFormat {
 mod tests {
     use super::*;
     use image::{ImageBuffer, Rgba};
+    use std::path::PathBuf;
 
     fn create_mock_jpeg() -> ImageBuffer<Rgba<u8>, Vec<u8>> {
         let mut buffer = vec![0; 400]; // 10x10 RGBA image = 400 bytes
@@ -241,20 +253,27 @@ mod tests {
         #[test]
         fn test_infer_format_jpeg() {
             let image = create_mock_jpeg();
-            assert_eq!(infer_format(&image), ImageFormat::Jpeg);
+            assert_eq!(infer_format(&image, None), ImageFormat::Jpeg);
         }
 
         #[test]
         fn test_infer_format_png() {
             let image = create_mock_png();
-            assert_eq!(infer_format(&image), ImageFormat::Png);
+            assert_eq!(infer_format(&image, None), ImageFormat::Png);
         }
 
         #[test]
-        #[should_panic(expected = "Could not guess image format.")]
-        fn test_infer_format_unknown() {
+        fn test_infer_format_from_path() {
             let image = create_mock_unknown();
-            infer_format(&image);
+            let path = PathBuf::from("test_image.png");
+            assert_eq!(infer_format(&image, Some(&path)), ImageFormat::Png);
+        }
+
+        #[test]
+        fn test_infer_format_fallback_to_jpeg() {
+            let image = create_mock_unknown();
+            let path = PathBuf::from("test_image.unknown");
+            assert_eq!(infer_format(&image, Some(&path)), ImageFormat::Jpeg);
         }
     }
 
