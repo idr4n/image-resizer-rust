@@ -1,6 +1,9 @@
 use fast_image_resize::{self as fr, images::Image};
 use image::{guess_format, DynamicImage, ImageBuffer, ImageFormat, Rgba};
-use std::{ffi::OsStr, path::Path};
+use std::{
+    ffi::OsStr,
+    path::{Path, PathBuf},
+};
 
 struct ImageContainer {
     new_width: u32,
@@ -8,6 +11,16 @@ struct ImageContainer {
     src_image: Image<'static>,
     dst_image: Image<'static>,
 }
+
+pub struct ImageInfo {
+    pub width: u32,
+    pub height: u32,
+    pub format: ImageFormat,
+    pub path: PathBuf,
+}
+
+pub type ResizedImageResult =
+    Result<(ImageBuffer<Rgba<u8>, Vec<u8>>, ImageInfo), Box<dyn std::error::Error>>;
 
 impl ImageContainer {
     fn new(
@@ -71,7 +84,7 @@ pub fn resize_image(
     input_path: &Path,
     width: Option<u32>,
     height: Option<u32>,
-) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>, Box<dyn std::error::Error>> {
+) -> ResizedImageResult {
     println!("The input given was: '{:?}'", input_path);
 
     println!(
@@ -80,6 +93,8 @@ pub fn resize_image(
         width.unwrap_or(0),
         height.unwrap_or(0),
     );
+
+    let original_format = image::ImageFormat::from_path(input_path)?;
 
     // Create Image instance from image path
     let mut img = ImageContainer::new(input_path, width, height)?;
@@ -102,7 +117,15 @@ pub fn resize_image(
     )
     .unwrap();
 
-    Ok(resized_img)
+    Ok((
+        resized_img,
+        ImageInfo {
+            width: img.new_width,
+            height: img.new_height,
+            format: original_format,
+            path: input_path.to_path_buf(),
+        },
+    ))
 }
 
 pub fn string_to_image_format(format: &str) -> Result<ImageFormat, Box<dyn std::error::Error>> {
@@ -117,7 +140,7 @@ pub fn save_image(
     image: ImageBuffer<Rgba<u8>, Vec<u8>>,
     output: &Path,
     format: Option<&String>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<ImageInfo, Box<dyn std::error::Error>> {
     let parent = output.parent().unwrap_or(Path::new(""));
     let stem = output.file_stem().unwrap_or(OsStr::new("output"));
     let extension = output.extension();
@@ -141,7 +164,9 @@ pub fn save_image(
     println!("Saving image to: {:?}", new_output);
     println!("Using format: {:?}", save_format);
 
-    // Convert RGBA to RGB if saving as JPEG
+    let width = image.width();
+    let height = image.height();
+
     let dynamic_image = if save_format == ImageFormat::Jpeg {
         DynamicImage::ImageRgba8(image).to_rgb8().into()
     } else {
@@ -150,7 +175,14 @@ pub fn save_image(
 
     dynamic_image
         .save_with_format(&new_output, save_format)
-        .map_err(|e| format!("Failed to save image: {}", e).into())
+        .map_err(|e| Box::<dyn std::error::Error>::from(format!("Failed to save image: {}", e)))?;
+
+    Ok(ImageInfo {
+        width,
+        height,
+        format: save_format,
+        path: new_output,
+    })
 }
 
 fn infer_format(image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageFormat {
@@ -225,5 +257,7 @@ mod tests {
             infer_format(&image);
         }
     }
+
+    // TODO: add tests for save_image
 }
 

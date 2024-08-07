@@ -18,13 +18,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let format = matches.get_one::<String>("format");
 
-    let resized_img = resize_image(input, width, height)?;
+    let (resized_img, _) = resize_image(input, width, height)?;
 
     let output_path = cli::determine_output_path(input, output)?;
 
-    save_image(resized_img, &output_path, format).map(|_| {
-        println!("Image saved! Output path: {:?}", output_path);
-    })?;
+    let save_info = save_image(resized_img, &output_path, format)?;
+
+    println!("Image resized and saved!");
+    println!("New dimensions: {}x{}", save_info.width, save_info.height);
+    println!("Format: {:?}", save_info.format);
+    println!("Output path: {:?}", save_info.path);
 
     Ok(())
 }
