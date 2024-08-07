@@ -1,9 +1,6 @@
 use fast_image_resize::{self as fr, images::Image};
 use image::{guess_format, DynamicImage, ImageBuffer, ImageFormat, Rgba};
-use std::{
-    ffi::OsStr,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 struct ImageContainer {
     new_width: u32,
@@ -128,38 +125,19 @@ pub fn resize_image(
     ))
 }
 
-pub fn string_to_image_format(format: &str) -> Result<ImageFormat, Box<dyn std::error::Error>> {
-    match format.to_lowercase().as_str() {
-        "jpeg" | "jpg" => Ok(ImageFormat::Jpeg),
-        "png" => Ok(ImageFormat::Png),
-        _ => Err(format!("Unsoported image format {}", format).into()),
-    }
-}
-
 pub fn save_image(
     image: ImageBuffer<Rgba<u8>, Vec<u8>>,
-    output: &Path,
+    output_path: &Path,
     format: Option<&String>,
 ) -> Result<ImageInfo, Box<dyn std::error::Error>> {
-    let parent = output.parent().unwrap_or(Path::new(""));
-    let stem = output.file_stem().unwrap_or(OsStr::new("output"));
-    let extension = output.extension();
-
-    let save_format = match (extension, format) {
-        (Some(ext), None) => {
-            string_to_image_format(ext.to_str().ok_or("Invalid Unicode in file extension")?)
-        }
-        (None, Some(f)) | (Some(_), Some(f)) => string_to_image_format(f),
-        (None, None) => Ok(infer_format(&image, Some(output))),
+    let save_format = match format {
+        Some(f) => string_to_image_format(f),
+        None => validate_image_format(infer_format(&image, Some(output_path))),
     }?;
 
-    let new_extension = match save_format {
-        ImageFormat::Png => "png",
-        ImageFormat::Jpeg => "jpeg",
-        _ => return Err("Unsupported image format".into()),
-    };
+    let new_extension = determine_extension(output_path, save_format);
 
-    let new_output = parent.join(stem).with_extension(new_extension);
+    let new_output = output_path.with_extension(new_extension);
 
     println!("Saving image to: {:?}", new_output);
     println!("Using format: {:?}", save_format);
@@ -183,6 +161,29 @@ pub fn save_image(
         format: save_format,
         path: new_output,
     })
+}
+
+fn string_to_image_format(format: &str) -> Result<ImageFormat, Box<dyn std::error::Error>> {
+    match format.to_lowercase().as_str() {
+        "jpeg" | "jpg" => Ok(ImageFormat::Jpeg),
+        "png" => Ok(ImageFormat::Png),
+        _ => Err(format!("Unsoported image format {}", format).into()),
+    }
+}
+
+fn validate_image_format(format: ImageFormat) -> Result<ImageFormat, Box<dyn std::error::Error>> {
+    match format {
+        ImageFormat::Png | ImageFormat::Jpeg => Ok(format),
+        _ => Err(format!("Unsoported image format {:?}", format).into()),
+    }
+}
+
+fn determine_extension(path: &Path, format: ImageFormat) -> String {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .filter(|&ext| (ext == "jpg" || ext == "jpeg") && format == ImageFormat::Jpeg)
+        .map(|ext| ext.to_string())
+        .unwrap_or_else(|| format.extensions_str()[0].to_string())
 }
 
 fn infer_format(image: &ImageBuffer<Rgba<u8>, Vec<u8>>, path: Option<&Path>) -> ImageFormat {
@@ -279,4 +280,3 @@ mod tests {
 
     // TODO: add tests for save_image
 }
-
