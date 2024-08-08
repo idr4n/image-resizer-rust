@@ -130,6 +130,13 @@ pub fn save_image(
     output_path: &Path,
     format: Option<&String>,
 ) -> Result<ImageInfo, Box<dyn std::error::Error>> {
+    let width = image.width();
+    let height = image.height();
+
+    if width == 0 || height == 0 {
+        return Err("Fail to save image: Empty image buffer".into());
+    }
+
     let save_format = match format {
         Some(f) => string_to_image_format(f),
         None => validate_image_format(infer_format(&image, Some(output_path))),
