@@ -163,22 +163,29 @@ mod tests {
 
         #[test]
         fn from_shell_relative() {
-            let input = Path::new("~/Downloads/shell_output.jpeg");
-            let output = Some(String::from("./output"));
+            let extensions = vec!["jpeg", "jpg", "png"];
 
-            let cmd_output = Command::new("echo")
-                .arg(input.to_string_lossy().to_string())
-                .output()
-                .expect("Failed to execute command");
+            for ext in extensions {
+                let input = Path::new("~/Downloads/shell_output.jpeg");
+                let output = Some(format!("./output.{}", ext));
 
-            let shell_path = String::from_utf8(cmd_output.stdout)
-                .unwrap()
-                .trim()
-                .to_string();
+                let cmd_output = Command::new("echo")
+                    .arg(input.to_string_lossy().to_string())
+                    .output()
+                    .expect("Failed to execute command");
 
-            let result = determine_output_path(Path::new(&shell_path), output);
-            assert!(result.is_ok());
-            assert_eq!(result.unwrap(), Path::new("~/Downloads/output"));
+                let shell_path = String::from_utf8(cmd_output.stdout)
+                    .unwrap()
+                    .trim()
+                    .to_string();
+
+                let result = determine_output_path(Path::new(&shell_path), output);
+                assert!(result.is_ok());
+                assert_eq!(
+                    result.unwrap(),
+                    Path::new(&format!("~/Downloads/output.{}", ext))
+                );
+            }
         }
     }
 
