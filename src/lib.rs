@@ -1,25 +1,60 @@
+//! # Image Resizing Library
+//!
+//! This library provides functionality for resizing images and saving them in various formats.
+//! It uses the `fast_image_resize` crate for efficient image resizing operations and the `image`
+//! crate for image I/O and format handling.
+//!
+//! Key features:
+//! - Resize images while maintaining aspect ratio
+//! - Support for JPEG and PNG formats
+//! - Automatic format detection and conversion
+//! - Efficient resizing using the `fast_image_resize` library
+//!
+//! The main functions provided are:
+//! - `resize_image`: Resizes an image file to specified dimensions
+//! - `save_image`: Saves a resized image buffer to a file
+//!
+//! This library is designed to be easy to use while providing robust error handling and
+//! flexibility in image processing tasks.
+
 use fast_image_resize::{self as fr, images::Image};
 use image::{guess_format, DynamicImage, ImageBuffer, ImageFormat, Rgba};
 use std::path::{Path, PathBuf};
 
+/// A container for holding source and destination images during the resizing process.
+///
+/// This struct encapsulates the data needed for image resizing operations, including
+/// the dimensions of the new image and the source and destination image buffers.
 struct ImageContainer {
+    /// The width of the resized image in pixels.
     new_width: u32,
+    /// The height of the resized image in pixels.
     new_height: u32,
+    /// The source image buffer, containing the original image data.
     src_image: Image<'static>,
+    /// The destination image buffer, where the resized image data will be stored.
     dst_image: Image<'static>,
 }
 
-pub struct ImageInfo {
-    pub width: u32,
-    pub height: u32,
-    pub format: ImageFormat,
-    pub path: PathBuf,
-}
-
-pub type ResizedImageResult =
-    Result<(ImageBuffer<Rgba<u8>, Vec<u8>>, ImageInfo), Box<dyn std::error::Error>>;
-
 impl ImageContainer {
+    /// Creates a new `ImageContainer` from a file path and optional new dimensions.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the input image file.
+    /// * `width` - An optional new width for the image. If None, it will be calculated based on the height.
+    /// * `height` - An optional new height for the image. If None, it will be calculated based on the width.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the new `ImageContainer` if successful, or an error if the operation fails.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if:
+    /// - The input file cannot be read or is not a valid image.
+    /// - The new dimensions cannot be determined.
+    /// - The image buffers cannot be created.
     fn new(
         path: &Path,
         width: Option<u32>,
@@ -54,6 +89,39 @@ impl ImageContainer {
     }
 }
 
+/// Represents information about an image.
+pub struct ImageInfo {
+    /// The width of the image in pixels.
+    pub width: u32,
+    /// The height of the image in pixels.
+    pub height: u32,
+    /// The format of the image (e.g., PNG, JPEG).
+    pub format: ImageFormat,
+    /// The file path of the image.
+    pub path: PathBuf,
+}
+
+/// A type alias for the result of resizing an image.
+///
+/// Returns a tuple containing:
+/// - An `ImageBuffer` with the resized image data
+/// - An `ImageInfo` struct with metadata about the resized image
+///
+/// Or an error if the resizing operation fails.
+pub type ResizedImageResult =
+    Result<(ImageBuffer<Rgba<u8>, Vec<u8>>, ImageInfo), Box<dyn std::error::Error>>;
+
+/// Determines the new dimensions for an image based on the provided width and height options.
+///
+/// # Arguments
+///
+/// * `img` - The original image.
+/// * `width` - An optional new width for the image.
+/// * `height` - An optional new height for the image.
+///
+/// # Returns
+///
+/// A tuple containing the new width and height, or an error if neither width nor height is specified.
 fn determine_new_dimensions(
     img: DynamicImage,
     width: Option<u32>,
@@ -77,6 +145,24 @@ fn determine_new_dimensions(
     Ok((new_width, new_height))
 }
 
+/// Resizes an image file to the specified dimensions.
+///
+/// # Arguments
+///
+/// * `input_path` - The path to the input image file.
+/// * `width` - An optional new width for the image. If None, it will be calculated based on the height.
+/// * `height` - An optional new height for the image. If None, it will be calculated based on the width.
+///
+/// # Returns
+///
+/// A `ResizedImageResult` containing the resized image buffer and its metadata, or an error if the operation fails.
+///
+/// # Errors
+///
+/// This function will return an error if:
+/// - The input file cannot be read or is not a valid image.
+/// - Neither width nor height is specified.
+/// - The resizing operation fails.
 pub fn resize_image(
     input_path: &Path,
     width: Option<u32>,
@@ -125,6 +211,25 @@ pub fn resize_image(
     ))
 }
 
+/// Saves an image buffer to a file.
+///
+/// # Arguments
+///
+/// * `image` - The `ImageBuffer` to save.
+/// * `output_path` - The path where the image should be saved.
+/// * `format` - An optional string specifying the desired output format ("jpeg" or "png").
+///              If None, the format will be inferred from the output path or image data.
+///
+/// # Returns
+///
+/// An `ImageInfo` struct with metadata about the saved image, or an error if the save operation fails.
+///
+/// # Errors
+///
+/// This function will return an error if:
+/// - The image buffer is empty.
+/// - The specified format is unsupported.
+/// - The image cannot be saved to the specified path.
 pub fn save_image(
     image: ImageBuffer<Rgba<u8>, Vec<u8>>,
     output_path: &Path,
@@ -167,6 +272,15 @@ pub fn save_image(
     })
 }
 
+/// Converts a string representation of an image format to the corresponding `ImageFormat`.
+///
+/// # Arguments
+///
+/// * `format` - A string representing the image format ("jpeg", "jpg", or "png").
+///
+/// # Returns
+///
+/// The corresponding `ImageFormat`, or an error if the format is unsupported.
 fn string_to_image_format(format: &str) -> Result<ImageFormat, Box<dyn std::error::Error>> {
     match format.to_lowercase().as_str() {
         "jpeg" | "jpg" => Ok(ImageFormat::Jpeg),
@@ -175,6 +289,15 @@ fn string_to_image_format(format: &str) -> Result<ImageFormat, Box<dyn std::erro
     }
 }
 
+/// Validates that the given image format is supported by this library.
+///
+/// # Arguments
+///
+/// * `format` - The `ImageFormat` to validate.
+///
+/// # Returns
+///
+/// The validated `ImageFormat` if it's supported, or an error if it's not.
 fn validate_image_format(format: ImageFormat) -> Result<ImageFormat, Box<dyn std::error::Error>> {
     match format {
         ImageFormat::Png | ImageFormat::Jpeg => Ok(format),
@@ -182,6 +305,16 @@ fn validate_image_format(format: ImageFormat) -> Result<ImageFormat, Box<dyn std
     }
 }
 
+/// Determines the appropriate file extension based on the image format and original path.
+///
+/// # Arguments
+///
+/// * `path` - The original file path.
+/// * `format` - The `ImageFormat` to use for determining the extension.
+///
+/// # Returns
+///
+/// A string representing the appropriate file extension.
 fn determine_extension(path: &Path, format: ImageFormat) -> String {
     path.extension()
         .and_then(|ext| ext.to_str())
@@ -190,6 +323,16 @@ fn determine_extension(path: &Path, format: ImageFormat) -> String {
         .unwrap_or_else(|| format.extensions_str()[0].to_string())
 }
 
+/// Infers the image format from the image buffer or file path.
+///
+/// # Arguments
+///
+/// * `image` - The `ImageBuffer` to analyze.
+/// * `path` - An optional file path to use for format inference if the buffer analysis fails.
+///
+/// # Returns
+///
+/// The inferred `ImageFormat`, defaulting to JPEG if the format cannot be determined.
 fn infer_format(image: &ImageBuffer<Rgba<u8>, Vec<u8>>, path: Option<&Path>) -> ImageFormat {
     // Convert the image buffer to a byte slice
     let bytes = image.as_raw();

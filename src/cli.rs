@@ -1,9 +1,27 @@
+//! CLI module for the Image Resizer application.
+//!
+//! This module provides the command-line interface functionality for the Image Resizer,
+//! including argument parsing, output path determination, and input/output path validation.
+//! It defines the structure of the CLI and handles user input processing for the application.
+
 use clap::{error::ErrorKind, value_parser, Arg, Command, Error};
 use std::{
     ffi::OsStr,
     path::{Path, PathBuf},
 };
 
+/// Builds and returns the command-line interface for the Image Resizer application.
+///
+/// This function defines the following CLI arguments:
+/// - `input` (required): Path to the input image file.
+/// - `width` (optional): New width of the image. Required if `height` not provided.
+/// - `height` (optional): New height of the image. Required if `width` not provided.
+/// - `format` (optional): Specify the output image format (jpeg or png).
+/// - `output` (optional): Path for the output image file.
+///
+/// # Returns
+///
+/// A `Command` struct representing the CLI configuration.
 pub fn cli() -> Command {
     Command::new("Image Resizer")
         .version("1.0")
@@ -47,6 +65,16 @@ pub fn cli() -> Command {
         )
 }
 
+/// Determines the output path for the resized image.
+///
+/// # Arguments
+///
+/// * `input` - A reference to the `Path` of the input image.
+/// * `output` - An optional `String` specifying the desired output path.
+///
+/// # Returns
+///
+/// A `Result` containing either the determined `PathBuf` for the output or an error.
 pub fn determine_output_path(
     input: &Path,
     output: Option<String>,
@@ -78,6 +106,15 @@ pub fn determine_output_path(
     }
 }
 
+/// Validates the provided output path.
+///
+/// # Arguments
+///
+/// * `path` - A reference to the `String` containing the output path to validate.
+///
+/// # Returns
+///
+/// A `Result` containing either the validated output path as a `String` or an error.
 fn validate_output_path(path: &String) -> Result<String, Box<dyn std::error::Error>> {
     let parent = Path::new(&path).parent().unwrap_or(Path::new(""));
 
@@ -97,6 +134,15 @@ fn validate_output_path(path: &String) -> Result<String, Box<dyn std::error::Err
     }
 }
 
+/// Custom value parser for validating input file paths.
+///
+/// # Arguments
+///
+/// * `p` - A string slice containing the path to validate.
+///
+/// # Returns
+///
+/// A `Result` containing either the validated `PathBuf` or a `clap::Error`.
 fn value_parser_for_path(p: &str) -> Result<PathBuf, Error> {
     let path = PathBuf::from(p);
     if path.exists() && path.is_file() {
