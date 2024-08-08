@@ -41,7 +41,7 @@ pub fn cli() -> Command {
             Arg::new("output")
                 .short('o')
                 .long("output")
-                .help("Absolute or relative path including new image name.\nIf only a name is provide (e.g. output.), then the directory of the input image will be used.")
+                .help("Absolute or relative path including new image name.\nIf only a name is provide (e.g. output.jpg), then the directory of the input image will be used.")
                 .required(false)
                 .value_parser(value_parser!(String)),
         )
@@ -59,10 +59,14 @@ pub fn determine_output_path(
         Some(output_path) => {
             let validated_output = validate_output_path(&output_path)?;
             let path_new = Path::new(&validated_output);
+            let path_new = match path_new.extension() {
+                Some(_) => path_new.to_path_buf(),
+                None => path_new.with_extension(extension),
+            };
             if path_new.is_absolute() {
                 Ok(path_new.to_path_buf())
             } else {
-                Ok(parent.join(output_path))
+                Ok(parent.join(path_new))
             }
         }
         None => {
