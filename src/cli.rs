@@ -28,25 +28,24 @@ pub fn cli() -> Command {
         .about("Resizes images based on provided dimensions")
         .arg(
             Arg::new("input")
-                .short('i')
-                .long("input")
                 .help("Path to the input image")
                 .required(true)
-                .value_parser(value_parser_for_path),
+                .value_parser(value_parser_for_path)
+                .index(1)
         )
         .arg(
             Arg::new("width")
                 .short('W')
                 .long("width")
                 .help("New width of the image")
-                .value_parser(clap::value_parser!(u32)),
+                .value_parser(clap::value_parser!(u32))
         )
         .arg(
             Arg::new("height")
                 .short('H')
                 .long("height")
                 .help("New height of the image")
-                .value_parser(clap::value_parser!(u32)),
+                .value_parser(clap::value_parser!(u32))
         )
         .arg(
             Arg::new("format")
@@ -61,7 +60,7 @@ pub fn cli() -> Command {
                 .long("output")
                 .help("Absolute or relative path including new image name.\nIf only a name is provide (e.g. output.jpg), then the directory of the input image will be used.")
                 .required(false)
-                .value_parser(value_parser!(String)),
+                .value_parser(value_parser!(String))
         )
 }
 
