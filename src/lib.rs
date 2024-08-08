@@ -149,9 +149,6 @@ pub fn save_image(
     println!("Saving image to: {:?}", new_output);
     println!("Using format: {:?}", save_format);
 
-    let width = image.width();
-    let height = image.height();
-
     let dynamic_image = if save_format == ImageFormat::Jpeg {
         DynamicImage::ImageRgba8(image).to_rgb8().into()
     } else {
@@ -285,5 +282,80 @@ mod tests {
         }
     }
 
-    // TODO: add tests for save_image
+    mod save_image_test {
+        use super::*;
+        use tempfile::TempDir;
+
+        #[test]
+        fn test_save_image_jpg() {
+            let dir = TempDir::new().expect("Failed to create a temp dir");
+            let image = create_mock_jpeg();
+            let width = image.width();
+            let height = image.height();
+            let output_path = dir.path().join("output.jpg");
+            let format = String::from("jpeg");
+
+            let result = save_image(image, output_path.as_path(), Some(&format)).unwrap();
+
+            assert_eq!(result.path, output_path);
+            assert_eq!(result.format, ImageFormat::Jpeg);
+            assert_eq!(result.width, width);
+            assert_eq!(result.height, height);
+        }
+
+        #[test]
+        fn test_save_image_different_format() {
+            let dir = TempDir::new().expect("Failed to create a temp dir");
+            let image = create_mock_jpeg();
+            let width = image.width();
+            let height = image.height();
+            let output_path = dir.path().join("output.jpg");
+            let format = String::from("png");
+
+            let result = save_image(image, output_path.as_path(), Some(&format)).unwrap();
+
+            assert_eq!(result.path, dir.path().join("output.png"));
+            assert_eq!(result.format, ImageFormat::Png);
+            assert_eq!(result.width, width);
+            assert_eq!(result.height, height);
+        }
+
+        #[test]
+        fn test_save_image_failure() {
+            let image = create_mock_jpeg();
+            let non_existent_dir = PathBuf::from("/non/existent/directory");
+            let output_path = non_existent_dir.join("output.jpg");
+            let format = String::from("jpeg");
+
+            let result = save_image(image, output_path.as_path(), Some(&format));
+
+            assert!(result.is_err());
+            if let Err(e) = result {
+                assert!(e.to_string().contains("Failed to save image"));
+            } else {
+                panic!("Expected an error, but got Ok");
+            }
+        }
+
+        #[test]
+        fn test_save_image_empty_buffer() {
+            let dir = TempDir::new().expect("Failed to create a temp dir");
+            // Create an empty image buffer
+            let empty_image: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(0, 0);
+            let output_path = dir.path().join("empty_output.jpg");
+            let format = String::from("jpeg");
+
+            let result = save_image(empty_image, output_path.as_path(), Some(&format));
+
+            assert!(result.is_err());
+            if let Err(e) = result {
+                assert!(e
+                    .to_string()
+                    .contains("Fail to save image: Empty image buffer"));
+            } else {
+                panic!("Expected an error, but got Ok");
+            }
+        }
+    }
 }
+
