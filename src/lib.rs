@@ -157,7 +157,7 @@ pub fn save_image(
 
     dynamic_image
         .save_with_format(&new_output, save_format)
-        .map_err(|e| Box::<dyn std::error::Error>::from(format!("Failed to save image: {}", e)))?;
+        .map_err(|e| format!("Failed to save image: {}", e))?;
 
     Ok(ImageInfo {
         width,
@@ -358,4 +358,3 @@ mod tests {
         }
     }
 }
-
