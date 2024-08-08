@@ -37,14 +37,14 @@ pub fn cli() -> Command {
             Arg::new("width")
                 .short('W')
                 .long("width")
-                .help("New width of the image")
+                .help("New width of the image. Required if --height not provided.")
                 .value_parser(clap::value_parser!(u32))
         )
         .arg(
             Arg::new("height")
                 .short('H')
                 .long("height")
-                .help("New height of the image")
+                .help("New height of the image. Required if --width not provided.")
                 .value_parser(clap::value_parser!(u32))
         )
         .arg(

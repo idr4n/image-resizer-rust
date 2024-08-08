@@ -7,6 +7,7 @@
 
 mod cli;
 
+use clap::error::ErrorKind;
 use image_resizer_rust::{resize_image, save_image};
 use std::path::PathBuf;
 
@@ -46,9 +47,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let width = matches.get_one::<u32>("width").copied();
     let height = matches.get_one::<u32>("height").copied();
 
-    // this is also checked by resize_image(), so not really needed here.
     if width.is_none() && height.is_none() {
-        return Err("At least one of width or height must be specified".into());
+        let err = cli::cli().error(
+            ErrorKind::InvalidValue,
+            "At least one of --width or --height must be specified.",
+        );
+        err.exit();
     }
 
     let format = matches.get_one::<String>("format");
