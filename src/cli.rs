@@ -84,9 +84,15 @@ pub fn determine_output_path(
     let parent = input.parent().unwrap_or(Path::new(""));
     let stem = input.file_stem().unwrap_or(OsStr::new("output"));
     let extension = input.extension().unwrap_or(OsStr::new("jpeg"));
+    let new_stem = PathBuf::from(format!("{}_resized", stem.to_string_lossy()));
 
     match output {
         Some(output_path) => {
+            if Path::new(&output_path).is_dir() {
+                return Ok(PathBuf::from(output_path)
+                    .join(new_stem)
+                    .with_extension(extension));
+            };
             let validated_output = validate_output_path(&output_path)?;
             let path_new = Path::new(&validated_output);
             let path_new = match path_new.extension() {
@@ -99,12 +105,7 @@ pub fn determine_output_path(
                 Ok(parent.join(path_new))
             }
         }
-        None => {
-            let new_stem = format!("{}_resized", stem.to_string_lossy());
-            Ok(parent
-                .join(PathBuf::from(new_stem))
-                .with_extension(extension))
-        }
+        None => Ok(parent.join(new_stem).with_extension(extension)),
     }
 }
 
