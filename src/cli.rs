@@ -5,8 +5,11 @@
 //! It defines the structure of the CLI and handles user input processing for the application.
 
 use clap::{error::ErrorKind, value_parser, Arg, Command, Error};
+use image::ImageFormat;
 use std::{
     ffi::OsStr,
+    fs::File,
+    io::Read,
     path::{Path, PathBuf},
 };
 
@@ -23,7 +26,7 @@ use std::{
 ///
 /// A `Command` struct representing the CLI configuration.
 pub fn cli() -> Command {
-    Command::new("Image Resizer")
+    Command::new("image-resizer-rust")
         .version("1.0")
         .about("Resizes images based on provided dimensions")
         .arg(
@@ -133,7 +136,9 @@ fn validate_output_path(path: &String) -> Result<String, Box<dyn std::error::Err
     }
 }
 
-/// Custom value parser for validating input file paths.
+/// Custom value parser for validating input image file paths.
+///
+/// This function checks if the given path exists, is a file, and represents a valid image format.
 ///
 /// # Arguments
 ///
@@ -142,17 +147,88 @@ fn validate_output_path(path: &String) -> Result<String, Box<dyn std::error::Err
 /// # Returns
 ///
 /// A `Result` containing either the validated `PathBuf` or a `clap::Error`.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The path does not exist or is not a file.
+/// - The file is not recognized as a supported image format.
 fn value_parser_for_path(p: &str) -> Result<PathBuf, Error> {
     let path = PathBuf::from(p);
-    if path.exists() && path.is_file() {
-        Ok(path)
-    } else {
-        // Clap custom error
-        Err(Error::raw(
+
+    if !path.exists() || !path.is_file() {
+        return Err(cli().error(
             ErrorKind::InvalidValue,
-            format!("The path '{}' does not exist or is not a file.", p),
-        ))
+            format!("The path {} does not exist or is not a file.", p),
+        ));
     }
+
+    if !is_image(&path) {
+        return Err(cli().error(
+            ErrorKind::InvalidValue,
+            format!("The file '{}' does not seem to be an image.", p),
+        ));
+    }
+
+    Ok(path)
+}
+
+/// Checks if the given file path points to a valid image file.
+///
+/// This function attempts to open the file, read its first 16 bytes,
+/// and use the `image` crate to guess the file format based on these bytes.
+/// It then checks if the guessed format is in the list of supported image formats.
+///
+/// # Arguments
+///
+/// * `path` - A reference to the `Path` of the file to check.
+///
+/// # Returns
+///
+/// `true` if the file is a supported image format, `false` otherwise.
+fn is_image(path: &Path) -> bool {
+    let mut file = match File::open(path) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+
+    let mut buffer = [0; 16];
+    if file.read_exact(&mut buffer).is_err() {
+        return false;
+    }
+
+    image::guess_format(&buffer)
+        .map(|format| supported_image_formats().contains(&format))
+        .unwrap_or(false)
+}
+
+/// Returns a static slice of supported image formats.
+///
+/// This function provides a list of image formats that the application
+/// considers as valid for processing. It includes common formats like
+/// PNG, JPEG, GIF, as well as less common ones like WebP, TIFF, and AVIF.
+///
+/// # Returns
+///
+/// A static slice of `ImageFormat` enum variants representing supported formats.
+fn supported_image_formats() -> &'static [ImageFormat] {
+    &[
+        ImageFormat::Png,
+        ImageFormat::Jpeg,
+        ImageFormat::Gif,
+        ImageFormat::WebP,
+        ImageFormat::Pnm,
+        ImageFormat::Tiff,
+        ImageFormat::Tga,
+        ImageFormat::Dds,
+        ImageFormat::Bmp,
+        ImageFormat::Ico,
+        ImageFormat::Hdr,
+        ImageFormat::OpenExr,
+        ImageFormat::Farbfeld,
+        ImageFormat::Avif,
+        ImageFormat::Qoi,
+    ]
 }
 
 #[cfg(test)]

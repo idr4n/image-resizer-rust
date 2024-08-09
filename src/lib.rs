@@ -139,7 +139,9 @@ fn determine_new_dimensions(
             // println!("src_width {}, src_height {}", img.width(), img.height());
             ((h as f32 * aspect_ratio) as u32, h)
         }
-        (None, None) => return Err("At least one of width or height must be specified".into()),
+        (None, None) => {
+            return Err("Error: At least one of width or height must be specified".into())
+        }
     };
 
     Ok((new_width, new_height))
@@ -244,7 +246,7 @@ pub fn save_image(
 
     let save_format = match format {
         Some(f) => string_to_image_format(f),
-        None => validate_image_format(infer_format(&image, Some(output_path))),
+        None => validate_new_image_format(infer_format(&image, Some(output_path))),
     }?;
 
     let new_extension = determine_extension(output_path, save_format);
@@ -298,10 +300,16 @@ fn string_to_image_format(format: &str) -> Result<ImageFormat, Box<dyn std::erro
 /// # Returns
 ///
 /// The validated `ImageFormat` if it's supported, or an error if it's not.
-fn validate_image_format(format: ImageFormat) -> Result<ImageFormat, Box<dyn std::error::Error>> {
+fn validate_new_image_format(
+    format: ImageFormat,
+) -> Result<ImageFormat, Box<dyn std::error::Error>> {
     match format {
         ImageFormat::Png | ImageFormat::Jpeg => Ok(format),
-        _ => Err(format!("Unsoported image format {:?}", format).into()),
+        _ => Err(format!(
+            "Unsoported conversion to image format '{:?}'. Specify a valid format with --format.",
+            format
+        )
+        .into()),
     }
 }
 
