@@ -382,8 +382,9 @@ mod tests {
             let shell_path = String::from_utf8(output.stdout).unwrap().trim().to_string();
 
             let result = value_parser_for_path(&shell_path);
-            assert!(result.is_ok());
-            assert_eq!(result.unwrap(), path);
+            assert!(result.is_err_and(|error| error.to_string().contains(
+                format!("The file '{}' does not seem to be an image.", shell_path).as_str()
+            )));
         }
 
         #[test]
