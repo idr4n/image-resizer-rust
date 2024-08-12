@@ -87,22 +87,23 @@ pub fn determine_output_path(
     let new_stem = PathBuf::from(format!("{}_resized", stem.to_string_lossy()));
 
     match output {
-        Some(output_path) => {
-            if Path::new(&output_path).is_dir() {
-                return Ok(PathBuf::from(output_path)
-                    .join(new_stem)
-                    .with_extension(extension));
+        Some(p) => {
+            // check if given output is a directory. If yes, return directory/new_stem.jpeg
+            if Path::new(&p).is_dir() {
+                let output_path = PathBuf::from(p).join(new_stem).with_extension(extension);
+                return Ok(output_path);
             };
-            let validated_output = validate_output_path(&output_path)?;
+            let validated_output = validate_output_path(&p)?;
             let path_new = Path::new(&validated_output);
-            let path_new = match path_new.extension() {
+            let mut path_new_buf = match path_new.extension() {
                 Some(_) => path_new.to_path_buf(),
                 None => path_new.with_extension(extension),
             };
-            if path_new.is_absolute() {
-                Ok(path_new.to_path_buf())
+            if path_new_buf.is_absolute() {
+                Ok(path_new_buf)
             } else {
-                Ok(parent.join(path_new))
+                path_new_buf = parent.join(path_new_buf);
+                Ok(path_new_buf)
             }
         }
         None => Ok(parent.join(new_stem).with_extension(extension)),
