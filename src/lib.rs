@@ -59,20 +59,20 @@ impl ImageContainer {
     /// - The image buffers cannot be created.
     fn new(
         img: DynamicImage,
-        width: Option<u32>,
-        height: Option<u32>,
+        width: Option<&u32>,
+        height: Option<&u32>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
+        let (new_width, new_height) = determine_new_dimensions(&img, width, height)?;
+
         // Create a fast_image_resize::Image from the opened image
         let src_width = std::num::NonZeroU32::new(img.width()).unwrap();
         let src_height = std::num::NonZeroU32::new(img.height()).unwrap();
         let src_image = fr::images::Image::from_vec_u8(
             src_width.get(),
             src_height.get(),
-            img.to_rgba8().into_raw(),
+            img.into_rgba8().into_raw(),
             fr::PixelType::U8x4,
         )?;
-
-        let (new_width, new_height) = determine_new_dimensions(img, width, height)?;
 
         // Create destination image
         let dst_width = std::num::NonZeroU32::new(new_width).unwrap();
@@ -113,21 +113,21 @@ pub struct ImageInfo {
 ///
 /// A tuple containing the new width and height, or an error if neither width nor height is specified.
 fn determine_new_dimensions(
-    img: DynamicImage,
-    width: Option<u32>,
-    height: Option<u32>,
+    img: &DynamicImage,
+    width: Option<&u32>,
+    height: Option<&u32>,
 ) -> Result<(u32, u32), Box<dyn std::error::Error>> {
     let (new_width, new_height) = match (width, height) {
-        (Some(w), Some(h)) => (w, h),
+        (Some(w), Some(h)) => (*w, *h),
         (Some(w), None) => {
             let aspect_ratio = img.height() as f32 / img.width() as f32;
             // println!("src_width {}, src_height {}", img.width(), img.height());
-            (w, (w as f32 * aspect_ratio) as u32)
+            (*w, (*w as f32 * aspect_ratio) as u32)
         }
         (None, Some(h)) => {
             let aspect_ratio = img.width() as f32 / img.height() as f32;
             // println!("src_width {}, src_height {}", img.width(), img.height());
-            ((h as f32 * aspect_ratio) as u32, h)
+            ((*h as f32 * aspect_ratio) as u32, *h)
         }
         (None, None) => {
             return Err("Error: At least one of width or height must be specified".into())
@@ -156,8 +156,8 @@ fn determine_new_dimensions(
 /// - The resizing operation fails.
 pub fn resize_image(
     input: DynamicImage,
-    width: Option<u32>,
-    height: Option<u32>,
+    width: Option<&u32>,
+    height: Option<&u32>,
 ) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>, Box<dyn std::error::Error>> {
     // Create Image instance from a DynamicImage input
     let mut img = ImageContainer::new(input, width, height)?;
@@ -173,7 +173,7 @@ pub fn resize_image(
     resizer.resize(&img.src_image, &mut img.dst_image, &resize_options)?;
 
     // After resizing, create image buffer
-    let resized_img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(
+    let resized_img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_vec(
         img.new_width,
         img.new_height,
         img.dst_image.buffer().to_vec(),

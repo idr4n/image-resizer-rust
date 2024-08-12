@@ -63,9 +63,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let matches = cli::cli().get_matches();
 
     let input = matches.get_one::<PathBuf>("input").unwrap();
-    let output = matches.get_one::<String>("output").cloned();
-    let width = matches.get_one::<u32>("width").copied();
-    let height = matches.get_one::<u32>("height").copied();
+    let output = matches.get_one::<String>("output");
+    let width = matches.get_one::<u32>("width");
+    let height = matches.get_one::<u32>("height");
 
     if width.is_none() && height.is_none() {
         let err = cli::cli().error(

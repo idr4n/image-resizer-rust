@@ -79,7 +79,7 @@ pub fn cli() -> Command {
 /// A `Result` containing either the determined `PathBuf` for the output or an error.
 pub fn determine_output_path(
     input: &Path,
-    output: Option<String>,
+    output: Option<&String>,
 ) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let parent = input.parent().unwrap_or(Path::new(""));
     let stem = input.file_stem().unwrap_or(OsStr::new("output"));
@@ -93,7 +93,7 @@ pub fn determine_output_path(
                 let output_path = PathBuf::from(p).join(new_stem).with_extension(extension);
                 return Ok(output_path);
             };
-            let validated_output = validate_output_path(&p)?;
+            let validated_output = validate_output_path(p)?;
             let path_new = Path::new(&validated_output);
             let mut path_new_buf = match path_new.extension() {
                 Some(_) => path_new.to_path_buf(),
@@ -250,8 +250,8 @@ mod tests {
         #[test]
         fn with_output() {
             let input = PathBuf::from("/path/to/input.jpg");
-            let output = Some(String::from("output.png"));
-            let result = determine_output_path(&input, output).unwrap();
+            let output = String::from("output.png");
+            let result = determine_output_path(&input, Some(&output)).unwrap();
             assert_eq!(result, Path::new("/path/to/output.png"));
         }
 
@@ -269,7 +269,7 @@ mod tests {
             let output = temp_dir.path().join("output.png");
 
             let result =
-                determine_output_path(&input, Some(output.to_string_lossy().to_string())).unwrap();
+                determine_output_path(&input, Some(&output.to_string_lossy().to_string())).unwrap();
             assert_eq!(result, output);
             assert!(result.is_absolute());
             assert_eq!(result.extension().unwrap(), "png");
@@ -279,8 +279,8 @@ mod tests {
         #[test]
         fn with_current_dir() {
             let input = PathBuf::from("/path/to/input.jpg");
-            let output = Some(String::from("./output.png"));
-            let result = determine_output_path(&input, output).unwrap();
+            let output = String::from("./output.png");
+            let result = determine_output_path(&input, Some(&output)).unwrap();
             assert_eq!(result, Path::new("/path/to/output.png"));
         }
 
@@ -290,7 +290,7 @@ mod tests {
 
             for ext in extensions {
                 let input = Path::new("~/Downloads/shell_output.jpeg");
-                let output = Some(format!("./output.{}", ext));
+                let output = format!("./output.{}", ext);
 
                 let cmd_output = Command::new("echo")
                     .arg(input.to_string_lossy().to_string())
@@ -302,7 +302,7 @@ mod tests {
                     .trim()
                     .to_string();
 
-                let result = determine_output_path(Path::new(&shell_path), output);
+                let result = determine_output_path(Path::new(&shell_path), Some(&output));
                 assert!(result.is_ok());
                 assert_eq!(
                     result.unwrap(),
