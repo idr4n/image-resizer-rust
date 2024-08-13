@@ -9,7 +9,8 @@ mod cli;
 
 use clap::error::ErrorKind;
 use image_resizer_rust::{
-    check_if_path_exists, determine_save_format_and_path, resize_image, save_image,
+    check_if_path_exists, determine_save_format_and_path, estimate_size_and_encode,
+    image_format_to_string, resize_image, save_image,
 };
 use std::path::PathBuf;
 
@@ -66,6 +67,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let output = matches.get_one::<String>("output");
     let width = matches.get_one::<u32>("width");
     let height = matches.get_one::<u32>("height");
+    let new_format = matches.get_one::<String>("format");
 
     if width.is_none() && height.is_none() {
         let err = cli::cli().error(
@@ -76,21 +78,36 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let output_path = cli::determine_output_path(input, output)?;
-    let new_format = matches.get_one::<String>("format");
-
     let img = image::ImageReader::open(input)?.decode()?;
     let resized_img = resize_image(img, width, height)?;
 
     let (save_format, new_output) =
         determine_save_format_and_path(&resized_img, &output_path, new_format)?;
+
     check_if_path_exists(&new_output)?;
 
-    let save_info = save_image(resized_img, &new_output, save_format)?;
+    // Use get encoded image buffer and size
+    let (estimated_size, image_buffer) = estimate_size_and_encode(&resized_img, save_format)?;
+
+    println!(
+        "Estimated size ({}): {} bytes",
+        image_format_to_string(save_format).to_uppercase(),
+        estimated_size
+    );
+
+    let save_info = save_image(
+        image_buffer,
+        resized_img.width(),
+        resized_img.height(),
+        &new_output,
+        save_format,
+    )?;
 
     println!("Image resized and saved!");
     println!("New dimensions: {}x{}", save_info.width, save_info.height);
     println!("Format: {:?}", save_info.format);
     println!("Output path: {:?}", save_info.path);
+    println!("File size: {} bytes", save_info.file_size);
 
     Ok(())
 }

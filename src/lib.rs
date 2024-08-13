@@ -18,7 +18,7 @@
 //! flexibility in image processing tasks.
 
 use fast_image_resize::{self as fr, images::Image};
-use image::{buffer::ConvertBuffer, guess_format, DynamicImage, ImageBuffer, ImageFormat, Rgba};
+use image::{guess_format, DynamicImage, ImageBuffer, ImageEncoder, ImageFormat, Rgba};
 use std::{
     io::Write,
     path::{Path, PathBuf},
@@ -99,6 +99,8 @@ pub struct ImageInfo {
     pub format: ImageFormat,
     /// The file path of the image.
     pub path: PathBuf,
+    /// The size of the image file in bytes.
+    pub file_size: u64,
 }
 
 /// Determines the new dimensions for an image based on the provided width and height options.
@@ -183,11 +185,62 @@ pub fn resize_image(
     Ok(resized_img)
 }
 
-/// Saves an image buffer to a file.
+/// Estimates the size of an encoded image and returns the encoded buffer.
 ///
 /// # Arguments
 ///
-/// * `image` - The `ImageBuffer` to save.
+/// * `image` - The `ImageBuffer` to encode.
+/// * `format` - The `ImageFormat` specifying the desired output format (e.g., `ImageFormat::Jpeg` or `ImageFormat::Png`).
+///
+/// # Returns
+///
+/// A `Result` containing a tuple with:
+/// - The estimated size of the encoded image in bytes.
+/// - The encoded image buffer as a `Vec<u8>`.
+///
+/// # Errors
+///
+/// This function will return an error if:
+/// - The encoding process fails.
+/// - The specified format is not supported (currently only JPEG and PNG are supported).
+pub fn estimate_size_and_encode(
+    image: &ImageBuffer<Rgba<u8>, Vec<u8>>,
+    format: ImageFormat,
+) -> Result<(u64, Vec<u8>), Box<dyn std::error::Error>> {
+    let mut buffer = Vec::new();
+    let (width, height) = image.dimensions();
+
+    match format {
+        ImageFormat::Jpeg => {
+            let rbg_image = image::DynamicImage::ImageRgba8(image.clone()).into_rgb8();
+            image::codecs::jpeg::JpegEncoder::new(&mut buffer).encode(
+                &rbg_image,
+                width,
+                height,
+                image::ExtendedColorType::Rgb8,
+            )?;
+        }
+        ImageFormat::Png => {
+            image::codecs::png::PngEncoder::new(&mut buffer).write_image(
+                image,
+                width,
+                height,
+                image::ExtendedColorType::Rgba8,
+            )?;
+        }
+        _ => return Err("Unsoported format for estimation and encoding".into()),
+    }
+
+    Ok((buffer.len() as u64, buffer))
+}
+
+/// Saves an encoded image buffer to a file.
+///
+/// # Arguments
+///
+/// * `image_buffer` - The encoded image buffer as a `Vec<u8>`.
+/// * `width` - The width of the image in pixels.
+/// * `height` - The height of the image in pixels.
 /// * `output_path` - The path where the image should be saved.
 /// * `save_format` - The `ImageFormat` specifying the desired output format (e.g., `ImageFormat::Jpeg` or `ImageFormat::Png`).
 ///
@@ -198,20 +251,19 @@ pub fn resize_image(
 /// # Errors
 ///
 /// This function will return an error if:
-/// - The image buffer is empty.
+/// - The image dimensions are invalid (width or height is 0).
 /// - The file extension doesn't match the specified save format.
 /// - The output path has no file extension.
 /// - The image cannot be saved to the specified path.
 pub fn save_image(
-    image: ImageBuffer<Rgba<u8>, Vec<u8>>,
+    image_buffer: Vec<u8>,
+    width: u32,
+    height: u32,
     output_path: &Path,
     save_format: ImageFormat,
 ) -> Result<ImageInfo, Box<dyn std::error::Error>> {
-    let width = image.width();
-    let height = image.height();
-
     if width == 0 || height == 0 {
-        return Err("Failed to save image: Empty image buffer".into());
+        return Err("Failed to save image: Invalid dimensions".into());
     }
 
     // Check if the file extension matches the save format
@@ -228,22 +280,23 @@ pub fn save_image(
     }
 
     println!("Saving image to: {:?}", output_path);
-    println!("Using format: {:?}", save_format);
+    println!(
+        "Using format: {}",
+        image_format_to_string(save_format).to_uppercase()
+    );
 
-    let image_to_save = match save_format {
-        ImageFormat::Jpeg => DynamicImage::ImageRgb8(image.convert()),
-        _ => DynamicImage::ImageRgba8(image),
-    };
+    // Write the image buffer to the file
+    std::fs::write(output_path, &image_buffer)?;
 
-    image_to_save
-        .save_with_format(output_path, save_format)
-        .map_err(|e| format!("Failed to save image: {}", e))?;
+    // Get the file size of the saved image
+    let file_size = image_buffer.len() as u64;
 
     Ok(ImageInfo {
         width,
         height,
         format: save_format,
         path: output_path.to_path_buf(),
+        file_size,
     })
 }
 
@@ -299,6 +352,32 @@ pub fn determine_save_format_and_path(
     let new_output = output_path.with_extension(new_extension);
 
     Ok((save_format, new_output))
+}
+
+/// Converts an `ImageFormat` enum to its string representation.
+///
+/// This function takes an `ImageFormat` enum value and returns a `String`
+/// containing the name of the format in lowercase.
+///
+/// # Arguments
+///
+/// * `format` - The `ImageFormat` enum value to convert.
+///
+/// # Returns
+///
+/// A `String` representing the name of the image format.
+///
+/// # Examples
+///
+/// ```
+/// use image::ImageFormat;
+/// use image_resizer_rust::image_format_to_string;
+///
+/// assert_eq!(image_format_to_string(ImageFormat::Png), "Png");
+/// assert_eq!(image_format_to_string(ImageFormat::Jpeg), "Jpeg");
+/// ```
+pub fn image_format_to_string(format: ImageFormat) -> String {
+    format!("{:?}", format)
 }
 
 /// Checks if a given path exists and prompts the user for confirmation if it does.
@@ -515,7 +594,10 @@ mod tests {
             let output_path = dir.path().join("output.jpg");
             let format = ImageFormat::Jpeg;
 
-            let result = save_image(image, output_path.as_path(), format).unwrap();
+            let (_, image_buffer) = estimate_size_and_encode(&image, format).unwrap();
+
+            let result =
+                save_image(image_buffer, width, height, output_path.as_path(), format).unwrap();
 
             assert_eq!(result.path, output_path);
             assert_eq!(result.format, ImageFormat::Jpeg);
@@ -527,10 +609,14 @@ mod tests {
         fn test_save_image_different_format() {
             let dir = TempDir::new().expect("Failed to create a temp dir");
             let image = create_mock_jpeg();
+            let width = image.width();
+            let height = image.height();
             let output_path = dir.path().join("output.jpg");
             let format = ImageFormat::Png;
 
-            let result = save_image(image, output_path.as_path(), format);
+            let (_, image_buffer) = estimate_size_and_encode(&image, format).unwrap();
+
+            let result = save_image(image_buffer, width, height, output_path.as_path(), format);
 
             assert!(result.is_err());
             if let Err(e) = result {
@@ -546,34 +632,44 @@ mod tests {
         #[test]
         fn test_save_image_failure() {
             let image = create_mock_jpeg();
+            let width = image.width();
+            let height = image.height();
             let non_existent_dir = PathBuf::from("/non/existent/directory");
             let output_path = non_existent_dir.join("output.jpg");
             let format = ImageFormat::Jpeg;
 
-            let result = save_image(image, output_path.as_path(), format);
+            let (_, image_buffer) = estimate_size_and_encode(&image, format).unwrap();
+
+            let result = save_image(image_buffer, width, height, output_path.as_path(), format);
 
             assert!(result.is_err());
             if let Err(e) = result {
-                assert!(e.to_string().contains("Failed to save image"));
+                assert!(
+                    e.to_string().contains("No such file or directory"),
+                    "Unexpected error message: {}",
+                    e
+                );
             } else {
                 panic!("Expected an error, but got Ok");
             }
         }
 
         #[test]
-        fn test_save_image_empty_buffer() {
+        fn test_save_image_invalid_dimensions() {
             let dir = TempDir::new().expect("Failed to create a temp dir");
-            let empty_image: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(0, 0);
-            let output_path = dir.path().join("empty_output.jpg");
+            let image = create_mock_jpeg();
+            let output_path = dir.path().join("invalid_output.jpg");
             let format = ImageFormat::Jpeg;
 
-            let result = save_image(empty_image, output_path.as_path(), format);
+            let (_, image_buffer) = estimate_size_and_encode(&image, format).unwrap();
+
+            let result = save_image(image_buffer, 0, 0, output_path.as_path(), format);
 
             assert!(result.is_err());
             if let Err(e) = result {
                 assert!(e
                     .to_string()
-                    .contains("Failed to save image: Empty image buffer"));
+                    .contains("Failed to save image: Invalid dimensions"));
             } else {
                 panic!("Expected an error, but got Ok");
             }
