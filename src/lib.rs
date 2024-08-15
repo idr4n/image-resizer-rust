@@ -213,7 +213,7 @@ pub fn estimate_size_and_encode(
     match format {
         ImageFormat::Jpeg => {
             let rbg_image = image::DynamicImage::ImageRgba8(image.clone()).into_rgb8();
-            image::codecs::jpeg::JpegEncoder::new(&mut buffer).encode(
+            image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buffer, 75).encode(
                 &rbg_image,
                 width,
                 height,
@@ -221,12 +221,12 @@ pub fn estimate_size_and_encode(
             )?;
         }
         ImageFormat::Png => {
-            image::codecs::png::PngEncoder::new(&mut buffer).write_image(
-                image,
-                width,
-                height,
-                image::ExtendedColorType::Rgba8,
-            )?;
+            image::codecs::png::PngEncoder::new_with_quality(
+                &mut buffer,
+                image::codecs::png::CompressionType::default(),
+                image::codecs::png::FilterType::default(),
+            )
+            .write_image(image, width, height, image::ExtendedColorType::Rgba8)?;
         }
         _ => return Err("Unsoported format for estimation and encoding".into()),
     }
