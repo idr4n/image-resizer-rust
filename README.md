@@ -2,6 +2,8 @@
 
 Image-Resizer-Rust is a command-line tool for efficiently resizing images. It supports JPEG and PNG formats, with automatic format detection and conversion.
 
+Please note that this command-line tool is intended for personal use and is not published on Rust's docs.rs or crates.io. Therefore, it must be installed manually.
+
 ## Features
 
 - Resize images by specifying width, height, or both
